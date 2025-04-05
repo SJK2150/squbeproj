@@ -60,6 +60,7 @@ class MainScene extends Phaser.Scene {
 
     // Set up camera and world bounds
     this.setupCameraAndWorld();
+    this.setupTrailEffect();
 
     // Set up a floor collision detector at the bottom of the screen
     this.setupFloorDetector();
@@ -187,7 +188,7 @@ class MainScene extends Phaser.Scene {
   }
 
   setupFloorDetector() {
-    this.floorDetector = this.add.zone(0, 590, 4000, 10);
+    this.floorDetector = this.add.zone(0, 590, 1000000, 10);
     this.physics.world.enable(
       this.floorDetector,
       Phaser.Physics.Arcade.STATIC_BODY
@@ -233,6 +234,10 @@ class MainScene extends Phaser.Scene {
 
     // Update floor detector position to follow camera
     this.floorDetector.x = this.cameras.main.scrollX;
+    // Add this to your update function to detect falls
+if (this.player.y > this.game.config.height + 100) { // 100px buffer below screen
+    this.gameOver();
+}
   }
 
   handlePlayerControls() {
@@ -470,14 +475,16 @@ class MainScene extends Phaser.Scene {
 
   spawnSpotlightAt(x, y) {
   // Set a fixed height for all spotlights
-  const spotlightY = 200; // Adjust this value to set the desired height
+  const spotlightY = 200;
 
-  // Create the spotlight (black cube)
-  const spotlight = this.add.rectangle(x, spotlightY, 50, 50, 0x000000); // Black cube
-  this.physics.add.existing(spotlight); // Add physics to the rectangle
-  spotlight.body.setAllowGravity(false); // Disable gravity for the spotlight
-  spotlight.body.setVelocityX(-200); // Move left at a constant speed
-  this.spotlights.add(spotlight); // Add to the spotlights group
+  
+  const spotlight = this.add.rectangle(x, spotlightY, 50, 50, 0x000000);
+  this.physics.add.existing(spotlight, false);
+  spotlight.body.setAllowGravity(false);
+  spotlight.body.setVelocityX(-200);
+  spotlight.body.setCollideWorldBounds(false);
+  // Don’t add to this.spotlights yet
+  // Rest of the code...
 
   // Create the diverging beam of light (triangle)
   const beam = this.add.graphics();
@@ -488,7 +495,7 @@ class MainScene extends Phaser.Scene {
 
   // Function to update beam graphics and triangle points
   const updateBeam = () => {
-    beam.clear(); // Clear previous drawing
+    beam.clear();
     beam.fillStyle(0xffff00, 0.2);
     beam.beginPath();
     beam.moveTo(spotlight.x, spotlightY + 25);
@@ -512,10 +519,9 @@ class MainScene extends Phaser.Scene {
 
   // Check for overlap and update beam position every frame
   const overlapTimer = this.time.addEvent({
-    delay: 16, // Check every frame (60 FPS)
+    delay: 16,
     callback: () => {
       updateBeam(); // Update beam and triangle to follow spotlight
-
       if (
         Phaser.Geom.Triangle.ContainsPoint(
           beamTriangle,
@@ -531,19 +537,17 @@ class MainScene extends Phaser.Scene {
     loop: true,
   });
 
-  // Store the timer for cleanup
   spotlight.overlapTimer = overlapTimer;
 
   // Destroy the spotlight and beam when they move off-screen
   this.time.addEvent({
-    delay: 10000, // Adjust based on how long it takes to move off-screen
+    delay: 10000,
     callback: () => {
       if (spotlight.overlapTimer) {
-        spotlight.overlapTimer.remove(); // Stop the overlap timer
+        spotlight.overlapTimer.remove();
       }
-      spotlight.destroy(); // Destroy the physics rectangle
-      beam.destroy();     // Destroy the graphics object
-      // No need to destroy beamTriangle
+      spotlight.destroy();
+      beam.destroy();
     },
   });
 }
@@ -624,6 +628,124 @@ class MainScene extends Phaser.Scene {
   this.time.delayedCall(1000, () => {
     particles.destroy();
   });
+}
+// Add all these methods to your game class (the class that extends Phaser.Scene)
+
+// STEP 1: Add to your create() method
+setupTrailEffect() {
+  // Create a group to hold all trail elements
+  this.trailGroup = this.add.group();
+  
+  // Configure the trail parameters
+  this.trailConfig = {
+    enabled: true,
+    frequency: 3,          // Create a trail element every X frames
+    fadeTime: 300,         // How long it takes for trail elements to fade (ms)
+    maxTrailLength: 10,    // Maximum number of trail elements
+    alpha: 0.7,            // Starting alpha for trail elements
+    tint: this.player.tintTopLeft || 0xffffff, // Match player color
+    frameCounter: 0        // Counter to manage creation frequency
+  };
+  
+  // Set up the trail update to run on each frame
+  this.events.on('update', this.updateTrail, this);
+}
+
+// STEP 2: Add this method to your game class
+updateTrail() {
+  // Only create trail when player is moving and in the air
+  if (!this.trailConfig.enabled || 
+      !this.player || 
+      !this.player.visible || 
+      this.player.body.velocity.y === 0) { // Only when in the air (jumping)
+    return;
+  }
+  
+  // Control creation frequency
+  this.trailConfig.frameCounter++;
+  if (this.trailConfig.frameCounter < this.trailConfig.frequency) {
+    return;
+  }
+  this.trailConfig.frameCounter = 0;
+  
+  // Create a stylized trail element instead of a simple rectangle
+  const trailElement = this.createStylizedTrailElement();
+  
+  // Add to the trail group
+  this.trailGroup.add(trailElement);
+  
+  // Limit the trail length
+  if (this.trailGroup.getChildren().length > this.trailConfig.maxTrailLength) {
+    const oldestTrail = this.trailGroup.getFirstAlive();
+    if (oldestTrail) {
+      oldestTrail.destroy();
+    }
+  }
+  
+  // Fade out the trail element
+  this.tweens.add({
+    targets: trailElement,
+    alpha: 0,
+    scaleX: 0.8,
+    scaleY: 0.8,
+    duration: this.trailConfig.fadeTime,
+    onComplete: () => {
+      trailElement.destroy();
+    }
+  });
+}
+
+// STEP 3: Add this method for creating stylized trail elements
+createStylizedTrailElement() {
+  // Get player properties
+  const x = this.player.x;
+  const y = this.player.y;
+  const width = this.player.width;
+  const height = this.player.height;
+  
+  // Create a gradient or patterned trail instead of a solid one
+  const trailElement = this.add.graphics();
+  
+  // Choose between different styles
+  const style = Phaser.Math.Between(1, 3);
+  
+  if (style === 1) {
+    // Style 1: Glowing outline
+    trailElement.lineStyle(2, this.trailConfig.tint, this.trailConfig.alpha);
+    trailElement.strokeRect(-width/2, -height/2, width, height);
+  } 
+  else if (style === 2) {
+    // Style 2: Fade from inside to outside
+    trailElement.fillGradientStyle(
+      this.trailConfig.tint, this.trailConfig.tint, 
+      this.trailConfig.tint, this.trailConfig.tint, 
+      this.trailConfig.alpha, this.trailConfig.alpha, 
+      0, 0
+    );
+    trailElement.fillRect(-width/2, -height/2, width, height);
+  }
+  else {
+    // Style 3: Simple filled rectangle (similar to original)
+    trailElement.fillStyle(this.trailConfig.tint, this.trailConfig.alpha);
+    trailElement.fillRect(-width/2, -height/2, width, height);
+  }
+  
+  // Position the graphic
+  trailElement.x = x;
+  trailElement.y = y;
+  trailElement.rotation = this.player.rotation;
+  
+  return trailElement;
+}
+
+// STEP 4: Add this method to toggle the trail effect
+toggleTrailEffect(enabled = true) {
+  this.trailConfig.enabled = enabled;
+  
+  // Clear existing trail elements if disabled
+  if (!enabled) {
+    this.trailGroup.clear(true, true);
+  }
 }
   gameOver() {
   // Get player color before we change it (for the blast effect)
@@ -732,3 +854,4 @@ class MainScene extends Phaser.Scene {
   //   this.tweens.pauseAll();
   // }
 }
+
