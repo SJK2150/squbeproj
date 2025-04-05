@@ -72,10 +72,10 @@ class MainScene extends Phaser.Scene {
   }
 
   createUIElements() {
-    this.scoreText = this.add.text(10, 10, "Score: 0", {
-      fontSize: "20px",
-      fill: "#fff",
-    });
+    // this.scoreText = this.add.text(10, 10, "Score: 0", {
+    //   fontSize: "20px",
+    //   fill: "#fff",
+    // });
     this.controlsText = this.add
       .text(400, 10, "Controls: WASD or Arrow Keys", {
         fontSize: "16px",
@@ -182,7 +182,6 @@ class MainScene extends Phaser.Scene {
     const WORLD_WIDTH = 1000000; // 10,000 meters (1 million pixels)
     this.physics.world.setBounds(0, 0, WORLD_WIDTH, 600);
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, 600);
-
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
     this.cameras.main.setFollowOffset(-200, 0);
   }
@@ -204,14 +203,17 @@ class MainScene extends Phaser.Scene {
 
   update(time, delta) {
     // Calculate distance in meters
+    var disp=0
     const displacementInMeters = (this.player.x / 100).toFixed(1);
-
+    if(disp<displacementInMeters){
+      disp=displacementInMeters
+    }
     // Increase score based on displacement
-    this.score = Math.floor(displacementInMeters * 2);
+    this.score = Math.floor(disp * 2);
 
     // Update UI elements (change "DISTANCE" to "DISPLACEMENT" for clarity)
-    this.scoreText.setText("Score: " + this.score);
-    this.distanceText.setText(`DISPLACEMENT\n${displacementInMeters}m`);
+    // this.scoreText.setText("Score: " + this.score);
+    this.distanceText.setText(`DISPLACEMENT\n${disp}m`);
     this.distanceText.x = this.cameras.main.scrollX + 770;
 
     // Handle player controls
@@ -279,12 +281,85 @@ if (this.player.y > this.game.config.height + 100) { // 100px buffer below scree
     });
   }
 
+  
+  
   checkPlayerHiding() {
-    this.isHiding = false;
-    this.physics.overlap(this.player, this.platforms, () => {
-      this.isHiding = true;
-    });
+  this.isHiding = false; // Reset hiding state by default
+
+  // Ensure the player is touching a platform (bottom contact)
+  if (!this.player.body.touching.down && !this.player.body.blocked.down) {
+    return; // No hiding if not on a platform
   }
+
+  // Use player's actual width instead of assuming CUBE_SIZE
+  const playerWidth = this.player.width || this.CUBE_SIZE; // Fallback to CUBE_SIZE if width isn't set
+  const edgeWidth = 40; // Small width for edge detection
+  const edgeHeight = this.CUBE_SIZE;
+
+  // Left edge sensor (aligned to the leftmost edge of the player)
+  const leftEdgeSensor = this.physics.add
+    .sprite(
+      this.player.x - playerWidth / 2, // Left edge of player
+      this.player.y,
+      null // No visible sprite
+    )
+    .setSize(edgeWidth, edgeHeight)
+    .setVisible(false);
+
+  // Right edge sensor (aligned to the rightmost edge of the player)
+  const rightEdgeSensor = this.physics.add
+    .sprite(
+      this.player.x + playerWidth / 2, // Right edge of player
+      this.player.y,
+      null // No visible sprite
+    )
+    .setSize(edgeWidth, edgeHeight)
+    .setVisible(false);
+
+  // Check collisions with platforms
+  let leftEdgeContact = false;
+  let rightEdgeContact = false;
+
+  this.physics.world.overlap(
+    leftEdgeSensor,
+    this.platforms,
+    () => {
+      leftEdgeContact = true;
+    },
+    null,
+    this
+  );
+
+  this.physics.world.overlap(
+    rightEdgeSensor,
+    this.platforms,
+    () => {
+      rightEdgeContact = true;
+    },
+    null,
+    this
+  );
+
+  // Set hiding state if either edge is in contact
+  if (leftEdgeContact || rightEdgeContact) {
+    this.isHiding = true;
+  }
+
+  // Debug log to verify sensor positions and contact
+  console.log({
+    isHiding: this.isHiding,
+    leftEdgeX: leftEdgeSensor.x,
+    rightEdgeX: rightEdgeSensor.x,
+    leftContact: leftEdgeContact,
+    rightContact: rightEdgeContact,
+    playerX: this.player.x,
+    playerWidth: playerWidth
+  });
+
+  // Clean up sensors
+  leftEdgeSensor.destroy();
+  rightEdgeSensor.destroy();
+}
 
   applyPlayerRoll(delta) {
     if (!this.player.body.touching.down && !this.player.body.blocked.down) {
@@ -385,9 +460,9 @@ if (this.player.y > this.game.config.height + 100) { // 100px buffer below scree
   let currentY = this.BASE_PLATFORM_Y;
 
   for (let i = 0; i < numSegments; i++) {
-    // 20% chance to skip a platform segment, creating a gap
-    if (Phaser.Math.Between(0, 10) < 2) {
-      currentX += this.PLATFORM_WIDTH; // Skip this segment
+    // Only allow gaps after 10 meters (1000 pixels)
+    if (currentX > 1000 && Phaser.Math.Between(0, 10) < 2) {
+      currentX += this.PLATFORM_WIDTH; // Skip this segment to create a gap
       continue;
     }
 
@@ -483,8 +558,7 @@ if (this.player.y > this.game.config.height + 100) { // 100px buffer below scree
   spotlight.body.setAllowGravity(false);
   spotlight.body.setVelocityX(-200);
   spotlight.body.setCollideWorldBounds(false);
-  // Don’t add to this.spotlights yet
-  // Rest of the code...
+  
 
   // Create the diverging beam of light (triangle)
   const beam = this.add.graphics();
@@ -854,4 +928,5 @@ toggleTrailEffect(enabled = true) {
   //   this.tweens.pauseAll();
   // }
 }
+
 
