@@ -38,6 +38,13 @@ class StartScene extends Phaser.Scene {
       .fillStyle(0x000000, 1)
       .fillRect(0, 0, 80, 600)
       .generateTexture('platformExtension', 80, 600);
+    this.load.image('pixel', 'assets/pixel.png');
+  // OR generate a pixel texture on the fly if you don't have an image file:
+  const graphics = this.make.graphics();
+  graphics.fillStyle(0xffffff);
+  graphics.fillRect(0, 0, 2, 2);
+  graphics.generateTexture('pixel', 2, 2);
+  graphics.destroy();
   }
   
   create() {
