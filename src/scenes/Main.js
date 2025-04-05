@@ -175,6 +175,13 @@ class MainScene extends Phaser.Scene {
       callbackScope: this,
       loop: true,
     });
+
+    this.time.addEvent({
+      delay: 7500,
+      callback: this.spawnSpotlight,
+      callbackScope: this,
+      loop: true,
+    });
   }
 
   setupCameraAndWorld() {
@@ -489,7 +496,7 @@ if (this.player.y > this.game.config.height + 100) { // 100px buffer below scree
     // Spawn obstacles ahead of the player
     const aheadX = this.player.x + 800;
 
-    // Randomly decide whether to spawn a spike or spotlight
+    // Randomly decide whether to spawn a spike or not
     if (Phaser.Math.Between(0, 1) === 0) {
       // Find a platform in the area ahead to place a spike on
       let targetPlatform = null;
@@ -504,11 +511,14 @@ if (this.player.y > this.game.config.height + 100) { // 100px buffer below scree
           targetPlatform.x,
           targetPlatform.y - this.PLATFORM_HEIGHT / 2 - this.CUBE_SIZE / 2
         );
-        this.spawnSpotlightAt(aheadX, Phaser.Math.Between(100, 500));
       }
-    } else {
+    } 
+  }
+  spawnSpotlight(){
+    const aheadX = this.player.x + 800;
+      if (Phaser.Math.Between(0, 1) === 0) {
       this.spawnSpotlightAt(aheadX, Phaser.Math.Between(100, 500));
-    }
+    } 
   }
 
   spawnSpikeAt(x, y) {
@@ -556,7 +566,7 @@ if (this.player.y > this.game.config.height + 100) { // 100px buffer below scree
   const spotlight = this.add.rectangle(x, spotlightY, 50, 50, 0x000000);
   this.physics.add.existing(spotlight, false);
   spotlight.body.setAllowGravity(false);
-  spotlight.body.setVelocityX(-200);
+  spotlight.body.setVelocityX(-125);
   spotlight.body.setCollideWorldBounds(false);
   
 
@@ -928,5 +938,7 @@ toggleTrailEffect(enabled = true) {
   //   this.tweens.pauseAll();
   // }
 }
+
+
 
 
