@@ -21,8 +21,17 @@ class MainScene extends Phaser.Scene {
     this.maxJumps = 2;
     this.isHiding = false;
   }
+  preload() {
+    this.load.audio('jumpSound', 'assets/jumping.mp3');
+    this.load.audio('moveSound', 'assets/moving.mp3');
+    this.load.audio('breakSound', 'assets/breaking.mp3');
+  }
 
   create() {
+    
+        this.jumpSound = this.sound.add('jumpSound', { loop: true });
+        this.moveSound = this.sound.add('moveSound', { loop: true });
+        this.breakSound = this.sound.add('breakSound', { loop: true });
     // Set the background color (grey).
     this.cameras.main.setBackgroundColor("#808080");
 
@@ -203,6 +212,8 @@ class MainScene extends Phaser.Scene {
   }
 
   update(time, delta) {
+   
+  
     // Calculate distance in meters
     const displacementInMeters = (this.player.x / 100).toFixed(1);
 
@@ -241,15 +252,27 @@ if (this.player.y > this.game.config.height + 100) { // 100px buffer below scree
   }
 
   handlePlayerControls() {
-    // Handle player movement with WASD or arrow keys
-    if (this.cursors.left.isDown || this.wasd.left.isDown) {
+    const movingLeft = this.cursors.left.isDown || this.wasd.left.isDown;
+    const movingRight = this.cursors.right.isDown || this.wasd.right.isDown;
+  
+  
+    if (movingLeft) {
       this.player.setVelocityX(-this.movementSpeed);
-    } else if (this.cursors.right.isDown || this.wasd.right.isDown) {
+      if (!this.moveSound.isPlaying) {
+        this.moveSound.play({ loop: true });
+      }
+    } else if (movingRight) {
       this.player.setVelocityX(this.movementSpeed);
+      if (!this.moveSound.isPlaying) {
+        this.moveSound.play({ loop: true });
+      }
     } else {
       this.player.setVelocityX(0);
+      if (this.moveSound.isPlaying) {
+        this.moveSound.stop();
+      }
     }
-
+  
     // Jump with up arrow or W key
     if (
       (this.cursors.up.isDown || this.wasd.up.isDown) &&
@@ -259,10 +282,16 @@ if (this.player.y > this.game.config.height + 100) { // 100px buffer below scree
         Phaser.Input.Keyboard.JustDown(this.cursors.up) ||
         Phaser.Input.Keyboard.JustDown(this.wasd.up)
       ) {
+        if (this.jumpSound.isPlaying) {
+          this.jumpSound.stop(); 
+        }
+        this.jumpSound.play({ loop: false });
         this.handleJump();
+        
       }
     }
   }
+  
 
   cleanupOffscreenObjects() {
     // Remove off-screen obstacles.
@@ -296,6 +325,9 @@ if (this.player.y > this.game.config.height + 100) { // 100px buffer below scree
     if (this.jumpCount < this.maxJumps) {
       this.player.setVelocityY(GAME_CONSTANTS.JUMP_VELOCITY);
       this.jumpCount++;
+      
+  
+      
     }
   }
 
@@ -747,8 +779,8 @@ toggleTrailEffect(enabled = true) {
     this.trailGroup.clear(true, true);
   }
 }
-  gameOver() {
-  // Get player color before we change it (for the blast effect)
+gameOver() {
+// Get player color before we change it (for the blast effect)
   const playerColor = this.player.tintTopLeft || 0xffffff;
   
   // Create the blast effect at player position
@@ -756,6 +788,11 @@ toggleTrailEffect(enabled = true) {
   
   // Hide the player immediately
   this.player.setVisible(false);
+
+  this.breakSound.play({ loop: false })
+
+
+  
   
   // Stop all timers and events
   this.time.removeAllEvents(); // Stops all active timers
